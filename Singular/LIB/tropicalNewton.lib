@@ -286,9 +286,9 @@ static proc expectedValuation(poly h, list VV)
   }
   if (amb > 0)
   {
-    "h:"; h;
-    "VV:"; VV;
-    ERROR("expectedValuation: valuation ambiguous");
+    dbprint("h:", h, "VV:", VV, "expectedValuation: valuation ambiguous");
+    def nothing;
+    return(nothing);
   }
 
   return (vh);
@@ -357,7 +357,15 @@ static proc expectedNewtonPolygonNegSlopes(poly g, list VV, list #)
   number vh;
   for (i=1; i<=k; i++)
   {
-    vh = expectedValuation(G[2,i],VV);
+    def vhtemp = expectedValuation(G[2,i],VV);
+    // expected Newton Polygon is not unique, abort
+    if (typeof(vhtemp) == "none")
+    {
+      def nothing;
+      return(nothing);
+    }
+    vh = vhtemp;
+    kill vhtemp;
     M[i,1] = int(denominator(vh));
     M[i,2] = totalDeg(G[1,i]);
     M[i,3] = int(numerator(vh));
@@ -673,69 +681,57 @@ proc computeTriangularDecompositionIfNecessary(ideal I)
   return (triangL(I));
 }
 
-
-proc tropicalVarietyNewton(ideal I)
-"USAGE:   tropicalVarietyNewton(I); I ideal
-RETURN:  matrix, a matrix containing all elements of the tropical variety
-ASSUME:  uniformizingParameter is set, I monomial free and zero-dimensional
-EXAMPLE: example tropicalVarietyNewton; shows an example
-"
+static proc tropicalVarietyNewtonTriang(ideal J)
 {
-  if (defined(uniformizingParameter)==0)
-  {
-    ERROR("tropicalVarietyNewton: uniformizingParameter not set");
-  }
-  if(ordstr(basering)[1,2]!="lp")
-  {
-    ERROR("tropicalVarietyNewton: order must be lp");
-  }
-
-  list triangI = computeTriangularDecompositionIfNecessary(I);
-
-  int i,ii,j,jj,k,l;
-  list Vlocal;
-  ideal J;
+  int i, j, jj, k, l;
   list VV;
-  for (ii=1; ii<=size(triangI); ii++)
+  list Vlocal = newtonPolygonNegSlopes(J[1],1);
+  l = lexSmallestVariableIndex(J[1]);
+  "smallest variable: " + varstr(l);
+  for (jj=1; jj<=size(Vlocal); jj++)
   {
-    J = triangI[ii];
-    Vlocal = newtonPolygonNegSlopes(J[1],1);
-    for (jj=1; jj<=size(Vlocal); jj++)
-    {
-      list Vjj;
-      l = lexSmallestVariableIndex(J[1]);
-      Vjj[l] = Vlocal[jj];
-      VV[jj] = Vjj;
-      kill Vjj;
-    }
+    list Vjj;
+    Vjj[l] = Vlocal[jj];
+    VV[jj] = Vjj;
+    kill Vjj;
+  }
 
-    for (i=2; i<=size(J); i++)
+  for (i=2; i<=size(J); i++)
+  {
+    k = size(VV);
+    for (jj=1; jj<=k; jj++)
     {
-      k = size(VV);
-      for (jj=1; jj<=k; jj++)
+      def VlocalTmp = expectedNewtonPolygonNegSlopes(J[i],VV[jj],1);
+      // if we get none then the expected Newton polygon is not unique, hence
+      // we have to resort to magma
+      if (typeof(VlocalTmp)=="none")
       {
-        list Vlocal(jj) = expectedNewtonPolygonNegSlopes(J[i],VV[jj],1);
+        "Calling magma ...";
+        return(tropicalVarietyNewtonWithMagma(J));
       }
-      l = lexSmallestVariableIndex(J[i]);
-      for (jj=1; jj<=k; jj++)
+      list Vlocal(jj) = VlocalTmp;
+      kill VlocalTmp;
+    }
+    l = lexSmallestVariableIndex(J[i]);
+    "smallest variable: " + varstr(l);
+    for (jj=1; jj<=k; jj++)
+    {
+      for (j=1; j<=size(Vlocal(jj)); j++)
       {
-        for (j=1; j<=size(Vlocal(jj)); j++)
+        if (j==1)
         {
-          if (j==1)
-          {
-            VV[jj][l] = Vlocal(jj)[1];
-          }
-          else
-          {
-            VV[size(VV)+1] = VV[jj];
-            VV[size(VV)][l] = Vlocal(jj)[j];
-          }
+          VV[jj][l] = Vlocal(jj)[1];
+        }
+        else
+        {
+          VV[size(VV)+1] = VV[jj];
+          VV[size(VV)][l] = Vlocal(jj)[j];
         }
       }
-      for (jj=1; jj<=k; jj++)
-      {
-        kill Vlocal(jj);
-      }
+    }
+    for (jj=1; jj<=k; jj++)
+    {
+      kill Vlocal(jj);
     }
   }
   list TI;
@@ -760,12 +756,38 @@ EXAMPLE: example tropicalVarietyNewton; shows an example
     TI[jj] = -Vjj;
     kill Vjj;
   }
+  return(TI);
+}
+
+proc tropicalVarietyNewton(ideal I)
+"USAGE:   tropicalVarietyNewton(I); I ideal
+RETURN:  matrix, a matrix containing all elements of the tropical variety
+ASSUME:  uniformizingParameter is set, I monomial free and zero-dimensional
+EXAMPLE: example tropicalVarietyNewton; shows an example
+"
+{
+  if (defined(uniformizingParameter)==0)
+  {
+    ERROR("tropicalVarietyNewton: uniformizingParameter not set");
+  }
+  if(ordstr(basering)[1,2]!="lp")
+  {
+    ERROR("tropicalVarietyNewton: order must be lp");
+  }
+
+  int i;
+  list triangI = computeTriangularDecompositionIfNecessary(I);
+  list TI = list();
+  for (i=1; i<=size(triangI); i++)
+  {
+    TI = TI + tropicalVarietyNewtonTriang(triangI[i]);
+  }
 
   return (TI);
 }
 example
 { "EXAMPLE:"; echo = 2;
-  LIB "poly.lib";
+  //LIB "poly.lib";
   ring r = (0,t),(z,y,x),lp;
   number uniformizingParameter = t;
   export(uniformizingParameter);
@@ -1046,32 +1068,19 @@ EXAMPLE: example tropicalLinkNewton; shows an example
     kill ssubstDP;
     def ssubstLP = substRing(i,"lp");
     setring ssubstLP;
+    number uniformizingParameter=t;
+    export(uniformizingParameter);
+
     ideal substImagePos = imap(srestr,substImagePos);
     map substMapPos = srestr,substImagePos;
     ideal inIPos = std(substMapPos(inI));
-    number uniformizingParameter=t;
-    export(uniformizingParameter);
-    if (totalDeg(inIPos)>1)
-    {
-      "calling magma...";
-      list Tpos = tropicalVarietyNewtonWithMagma(inIPos);
-    }
-    else
-    {
-      list Tpos = tropicalVarietyNewton(inIPos);
-    }
+    list Tpos = tropicalVarietyNewton(inIPos);
+
     ideal substImageNeg = imap(srestr,substImageNeg);
     map substMapNeg = srestr,substImageNeg;
     ideal inINeg = std(substMapNeg(inI));
-    if (totalDeg(inINeg)>1)
-    {
-      "calling magma...";
-      list Tneg = tropicalVarietyNewtonWithMagma(inINeg);
-    }
-    else
-    {
-      list Tneg = tropicalVarietyNewton(inINeg);
-    }
+    list Tneg = tropicalVarietyNewton(inINeg);
+
     if (size(Tneg)>0)
     {
       setring origin;
