@@ -266,15 +266,6 @@ static proc lexSmallestVariableIndex(poly g)
   return (-1);
 }
 
-static proc numbersLessThanAsRationalNumbers(number a, number b)
-{
-  int a_num = int(numerator(a));
-  int a_denom = int(denominator(a));
-  int b_num = int(numerator(b));
-  int b_denom = int(denominator(b));
-  return (a_num*b_denom-b_num*a_denom<0);
-}
-
 static proc expectedValuation(poly h, list VV)
 {
   number vh = val(leadcoef(h[1]))+listDot(VV,leadexp(h[1]));
@@ -287,7 +278,7 @@ static proc expectedValuation(poly h, list VV)
     {
       amb = 1;
     }
-    if (numbersLessThanAsRationalNumbers(vhh,vh))
+    if (vhh < vh)
     {
       vh = vhh;
       amb = 0;
