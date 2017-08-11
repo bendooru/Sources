@@ -681,13 +681,45 @@ proc computeTriangularDecompositionIfNecessary(ideal I)
   return (triangL(I));
 }
 
-static proc tropicalVarietyNewtonTriang(ideal J)
+static proc boundVlocal(list Vlocal, number bound)
 {
+  list boundedVlocal;
+  number v;
+  for (int i = 1; i <= size(Vlocal); i++)
+  {
+    if (typeof(Vlocal[i]) == "poly")
+    {
+      v = val(Vlocal[i]);
+    }
+    else
+    {
+      v = Vlocal[i];
+    }
+    if (absValue(v) <= bound)
+    {
+      boundedVlocal[size(boundedVlocal)+1] = Vlocal[i];
+    }
+  }
+  return(boundedVlocal);
+}
+
+static proc tropicalVarietyNewtonTriang(ideal J, list #)
+{
+  int boundedSol = 0;
+  number bound = 1;
+  if (size(#) > 0)
+  {
+    bound = #[1];
+    boundedSol = 1;
+  }
   int i, j, jj, k, l;
   list VV;
   list Vlocal = newtonPolygonNegSlopes(J[1],1);
+  if (boundedSol)
+  {
+    Vlocal = boundVlocal(Vlocal, bound);
+  }
   l = lexSmallestVariableIndex(J[1]);
-  "smallest variable: " + varstr(l);
   for (jj=1; jj<=size(Vlocal); jj++)
   {
     list Vjj;
@@ -707,15 +739,33 @@ static proc tropicalVarietyNewtonTriang(ideal J)
       if (typeof(VlocalTmp)=="none")
       {
         "Calling magma ...";
-        return(tropicalVarietyNewtonWithMagma(J));
+        if (boundedSol)
+        {
+          // cast bound to int as finalizeMagmaFile only accepts int
+          return(tropicalVarietyNewtonWithMagma(J, int(bound)));
+        }
+        else
+        {
+          return(tropicalVarietyNewtonWithMagma(J));
+        }
       }
       list Vlocal(jj) = VlocalTmp;
+      if (boundedSol)
+      {
+        Vlocal(jj) = boundVlocal(Vlocal(jj), bound);
+      }
       kill VlocalTmp;
     }
     l = lexSmallestVariableIndex(J[i]);
-    "smallest variable: " + varstr(l);
     for (jj=1; jj<=k; jj++)
     {
+      // computing tropical roots with bound may leave Vlocal(jj) empty
+      if (size(Vlocal(jj)) == 0)
+      {
+        VV = delete(VV, jj);
+        k--;
+        continue;
+      }
       for (j=1; j<=size(Vlocal(jj)); j++)
       {
         if (j==1)
@@ -759,9 +809,10 @@ static proc tropicalVarietyNewtonTriang(ideal J)
   return(TI);
 }
 
-proc tropicalVarietyNewton(ideal I)
-"USAGE:   tropicalVarietyNewton(I); I ideal
+proc tropicalVarietyNewton(ideal I, list #)
+"USAGE:   tropicalVarietyNewton(I[, b]); I ideal, b number
 RETURN:  matrix, a matrix containing all elements of the tropical variety
+         if b is specified, return only elements in [-b, b]^N
 ASSUME:  uniformizingParameter is set, I monomial free and zero-dimensional
 EXAMPLE: example tropicalVarietyNewton; shows an example
 "
@@ -775,12 +826,24 @@ EXAMPLE: example tropicalVarietyNewton; shows an example
     ERROR("tropicalVarietyNewton: order must be lp");
   }
 
+  if (size(#) > 0)
+  {
+    if (typeof(#[1]) <> "number")
+    {
+      ERROR("tropicalVarietyNewton: wrong optional parameter");
+    }
+    if (#[1] < 0)
+    {
+      ERROR("tropicalVarietyNewton: negative bound");
+    }
+  }
+
   int i;
   list triangI = computeTriangularDecompositionIfNecessary(I);
   list TI = list();
   for (i=1; i<=size(triangI); i++)
   {
-    TI = TI + tropicalVarietyNewtonTriang(triangI[i]);
+    TI = TI + tropicalVarietyNewtonTriang(triangI[i], #);
   }
 
   return (TI);
