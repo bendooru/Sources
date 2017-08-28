@@ -681,7 +681,7 @@ proc computeTriangularDecompositionIfNecessary(ideal I)
   return (triangL(I));
 }
 
-static proc boundVlocal(list Vlocal, number bound)
+static proc boundVlocal(list Vlocal, int bound)
 {
   list boundedVlocal;
   number v;
@@ -689,7 +689,7 @@ static proc boundVlocal(list Vlocal, number bound)
   {
     if (typeof(Vlocal[i]) == "poly")
     {
-      v = val(Vlocal[i]);
+      v = val(leadcoef(Vlocal[i]));
     }
     else
     {
@@ -703,21 +703,22 @@ static proc boundVlocal(list Vlocal, number bound)
   return(boundedVlocal);
 }
 
-static proc tropicalVarietyNewtonTriang(ideal J, list #)
+static proc tropicalVarietyNewtonTriang(ideal J, int singlePoint, int bound)
 {
-  int boundedSol = 0;
-  number bound = 1;
-  if (size(#) > 0)
-  {
-    bound = #[1];
-    boundedSol = 1;
-  }
   int i, j, jj, k, l;
   list VV;
   list Vlocal = newtonPolygonNegSlopes(J[1],1);
-  if (boundedSol)
+  if (bound > 0)
   {
     Vlocal = boundVlocal(Vlocal, bound);
+    if (size(Vlocal) == 0)
+    {
+      return(list());
+    }
+  }
+  if (singlePoint)
+  {
+    Vlocal = Vlocal[1];
   }
   l = lexSmallestVariableIndex(J[1]);
   for (jj=1; jj<=size(Vlocal); jj++)
@@ -728,8 +729,12 @@ static proc tropicalVarietyNewtonTriang(ideal J, list #)
     kill Vjj;
   }
 
+  intvec deleteIndices;
+  int deleteEntries;
   for (i=2; i<=size(J); i++)
   {
+    deleteIndices = 0;
+    deleteEntries = 0;
     k = size(VV);
     for (jj=1; jj<=k; jj++)
     {
@@ -739,18 +744,23 @@ static proc tropicalVarietyNewtonTriang(ideal J, list #)
       if (typeof(VlocalTmp)=="none")
       {
         "Calling magma ...";
-        if (boundedSol)
+        list tMagma;
+        if (bound > 0)
         {
-          // cast bound to int as finalizeMagmaFile only accepts int
-          return(tropicalVarietyNewtonWithMagma(J, int(bound)));
+          tMagma = tropicalVarietyNewtonWithMagma(J, bound);
         }
         else
         {
-          return(tropicalVarietyNewtonWithMagma(J));
+          tMagma = tropicalVarietyNewtonWithMagma(J);
         }
+        if (singlePoint && size(tMagma) > 0)
+        {
+          tMagma = tMagma[1];
+        }
+        return(tMagma);
       }
       list Vlocal(jj) = VlocalTmp;
-      if (boundedSol)
+      if (bound > 0)
       {
         Vlocal(jj) = boundVlocal(Vlocal(jj), bound);
       }
@@ -760,11 +770,17 @@ static proc tropicalVarietyNewtonTriang(ideal J, list #)
     for (jj=1; jj<=k; jj++)
     {
       // computing tropical roots with bound may leave Vlocal(jj) empty
+      // remember index to remove it later
       if (size(Vlocal(jj)) == 0)
       {
-        VV = delete(VV, jj);
-        k--;
+        deleteEntries++;
+        deleteIndices[deleteEntries] = jj;
+        jj++;
         continue;
+      }
+      if (singlePoint)
+      {
+        Vlocal(jj) = Vlocal(jj)[1];
       }
       for (j=1; j<=size(Vlocal(jj)); j++)
       {
@@ -782,6 +798,11 @@ static proc tropicalVarietyNewtonTriang(ideal J, list #)
     for (jj=1; jj<=k; jj++)
     {
       kill Vlocal(jj);
+    }
+    // remove empty VV entries if necessary
+    if (deleteEntries > 0)
+    {
+      VV = deleteSublist(deleteIndices, VV);
     }
   }
   list TI;
@@ -810,8 +831,9 @@ static proc tropicalVarietyNewtonTriang(ideal J, list #)
 }
 
 proc tropicalVarietyNewton(ideal I, list #)
-"USAGE:   tropicalVarietyNewton(I[, b]); I ideal, b number
-RETURN:  matrix, a matrix containing all elements of the tropical variety
+"USAGE:   tropicalVarietyNewton(I[, s[, b]]); I ideal, s, b int
+RETURN:  matrix, a matrix containing all elements of the tropical variety;
+         if s is not 0, we compute only one point,
          if b is specified, return only elements in [-b, b]^N
 ASSUME:  uniformizingParameter is set, I monomial free and zero-dimensional
 EXAMPLE: example tropicalVarietyNewton; shows an example
@@ -826,16 +848,28 @@ EXAMPLE: example tropicalVarietyNewton; shows an example
     ERROR("tropicalVarietyNewton: order must be lp");
   }
 
+  int bound = 0;
+  int singlePoint = 0;
   if (size(#) > 0)
   {
-    if (typeof(#[1]) <> "number")
+    if (typeof(#[1]) <> "int")
     {
       ERROR("tropicalVarietyNewton: wrong optional parameter");
     }
-    if (#[1] < 0)
+    singlePoint = #[1];
+    if (size(#) > 1)
     {
-      ERROR("tropicalVarietyNewton: negative bound");
+      if (typeof(#[2]) <> "int")
+      {
+        ERROR("tropicalVarietyNewton: wrong optional parameter");
+      }
+      bound = #[2];
     }
+  }
+
+  if (singlePoint && bound > 0)
+  {
+    "Warning: result may be empty";
   }
 
   int i;
@@ -843,7 +877,11 @@ EXAMPLE: example tropicalVarietyNewton; shows an example
   list TI = list();
   for (i=1; i<=size(triangI); i++)
   {
-    TI = TI + tropicalVarietyNewtonTriang(triangI[i], #);
+    TI = TI + tropicalVarietyNewtonTriang(triangI[i], singlePoint, bound);
+    if (singlePoint && size(TI) > 0)
+    {
+      return(TI);
+    }
   }
 
   return (TI);
