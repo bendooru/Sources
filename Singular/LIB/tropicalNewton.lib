@@ -287,8 +287,9 @@ EXAMPLE: example newtonPolygonNegSlopes; shows an example
   matrix G = coef(g,var(n));
 
   // 2. create the matrix of vertices of the Newton polygon
+  int k = ncols(G);
   intmat M[k+1][3];
-  for (int i=1; i<=ncols(G); i++)
+  for (i=1; i<=k; i++)
   {
     def vh = val(G[2,i],VV);
     if (typeof(vh) == "none")
@@ -328,7 +329,7 @@ EXAMPLE: example newtonPolygonNegSlopes; shows an example
     if (F[i,3]!=0)
     {
       slope = number(F[i,2])/number(F[i,3]);
-      if (size(slopes)>1 && singlePoint)
+      if (size(slopes)>0 && singlePoint)
       {
         break;
       }
@@ -588,7 +589,7 @@ EXAMPLE: example tropicalPointNewton; shows an example
 
   for (i=2; i<=size(J); i++)
   {
-    Vlocal = expectedNewtonPolygonNegSlopes(J[i],VV,1);
+    Vlocal = newtonPolygonNegSlopes(J[i],VV,1);
     l = lexSmallestVariableIndex(J[i]);
     dbprint("possible values or valuations for "+string(var(l))+" (picking first): "+string(Vlocal));
     VV[l] = Vlocal[1];
@@ -688,28 +689,6 @@ proc computeTriangularDecompositionIfNecessary(ideal I)
   return (triangL(I));
 }
 
-static proc boundVlocal(list Vlocal, int bound)
-{
-  list boundedVlocal;
-  number v;
-  for (int i = 1; i <= size(Vlocal); i++)
-  {
-    if (typeof(Vlocal[i]) == "poly")
-    {
-      v = val(leadcoef(Vlocal[i]));
-    }
-    else
-    {
-      v = Vlocal[i];
-    }
-    if (absValue(v) <= bound)
-    {
-      boundedVlocal[size(boundedVlocal)+1] = Vlocal[i];
-    }
-  }
-  return(boundedVlocal);
-}
-
 static proc tropicalVarietyNewtonTriang(ideal J, intvec optionalFlags)
 {
   // 1. compute the negative slopes of the first Newton polgyon
@@ -734,7 +713,7 @@ static proc tropicalVarietyNewtonTriang(ideal J, intvec optionalFlags)
     k = size(VV);
     for (jj=1; jj<=k; jj++)
     {
-      def Vlocal(jj) = expectedNewtonPolygonNegSlopes(J[i],VV[jj],optionalFlags);
+      def Vlocal(jj) = newtonPolygonNegSlopes(J[i],VV[jj],optionalFlags);
       if (typeof(Vlocal(jj))=="none")
       {
         dbprint("newton polygon ambiguous, falling back to magma ...");
