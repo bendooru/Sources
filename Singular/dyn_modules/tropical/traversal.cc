@@ -167,9 +167,9 @@ std::set<tropical::groebnerCone> tropicalTraversal(const tropical::groebnerCone 
     }
 
     maximalGroebnerCone.deletePolynomialIdealAndRing();
-    maximalGroebnerCone.deletePolyhedralCone();
     finishedList.insert(maximalGroebnerCone);
     workingList.erase(maximalGroebnerCone);
+    maximalGroebnerCone.deletePolyhedralCone();
 
 #if TRAVERSAL_TIMINGS_ON
     std::clock_t titerationend = std::clock();
