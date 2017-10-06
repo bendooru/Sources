@@ -436,13 +436,7 @@ static proc listOfNumbersToMatrix(list L)
   return (Lmat);
 }
 
-proc cccMatrixToPositiveIntvec(matrix L)
-"USAGE:   cccMatrixToPositiveIntvec(M); M matrix
-RETURN:  intvec, strictly positive equivalent as weight vector to row vector in M
-ASSUME:  constant coefficient case only,
-         will scale weight vector and add vectors of ones to it
-EXAMPLE: example cccMatrixToPositiveIntvec; shows an example
-"
+static proc scaleAndCastToIntvec(matrix L)
 {
   int k = ncols(L);
   intvec denoms;
@@ -461,7 +455,18 @@ EXAMPLE: example cccMatrixToPositiveIntvec; shows an example
   {
     w[i] = int(number(L[1,i])*denoms_lcm);
   }
-  return (addOneVectorUntilPositive(w));
+  return(w);
+}
+
+proc cccMatrixToPositiveIntvec(matrix L)
+"USAGE:   cccMatrixToPositiveIntvec(M); M matrix
+RETURN:  intvec, strictly positive equivalent as weight vector to row vector in M
+ASSUME:  constant coefficient case only,
+         will scale weight vector and add vectors of ones to it
+EXAMPLE: example cccMatrixToPositiveIntvec; shows an example
+"
+{
+  return (addOneVectorUntilPositive(scaleAndCastToIntvec(L)));
 }
 example
 { "EXAMPLE:"; echo = 2;
@@ -508,7 +513,7 @@ static proc addOneVectorUntilPositive(intvec w)
 }
 
 proc tropicalPointNewton(ideal I, list #)
-"USAGE:   tropicalPointsLasVegas(I); I ideal
+"USAGE:   tropicalPointNewton(I); I ideal
 RETURN:  matrix, a matrix containing a tropical point as row vector
 ASSUME:  uniformizingParameter is set and the top-dimensional component of I is monomial free
 NOTE:    if printlevel sufficiently high will print intermediate data and timings
@@ -717,6 +722,8 @@ static proc tropicalVarietyNewtonTriang(ideal J, intvec optionalFlags)
       def Vlocal(jj) = newtonPolygonNegSlopes(J[i],VV[jj],optionalFlags);
       if (typeof(Vlocal(jj))=="none")
       {
+        "Magma not supported";
+        return(list());
         dbprint("newton polygon ambiguous, falling back to magma ...");
         list tMagma = tropicalVarietyNewtonWithMagma(J,optionalFlags);
         return(tMagma);
@@ -1355,6 +1362,87 @@ proc tropicalVarietyNewtonWithMagma(ideal I, intvec #)
   return (fetch(rTropCallMagma,TI));
 }
 
+// copied from groebnerCone.cc
+proc groebnerConeFromIdeals(ideal I, ideal inI)
+{
+  int N = nvars(basering);
+  int rInEq, rEq = 0, 0;
+  int i, j;
+  for (i = 1; i <= ncols(I); i++)
+  {
+    rInEq = rInEq + size(I[i]) - 1;
+  }
+  for (i = 1; i <= ncols(inI); i++)
+  {
+    rEq = rEq + size(inI[i]) - 1;
+  }
+  intmat inequalities[rInEq][N];
+  intmat equalities[rEq][N];
+  intvec leadexpv, tailexpv;
+  int row = 0;
+  for (i = 1; i <= ncols(I); i++)
+  {
+    leadexpv = leadexp(I[i]);
+    for (j = 2; j <= size(I[i]); j++)
+    {
+      row++;
+      tailexpv = leadexp(I[i][j]);
+      inequalities[row,1..N] = leadexpv-tailexpv;
+    }
+  }
+  row = 0;
+  for (i = 1; i <= ncols(inI); i++)
+  {
+    leadexpv = leadexp(inI[i]);
+    for (j = 2; j <= size(inI[i]); j++)
+    {
+      row++;
+      tailexpv = leadexp(I[i][j]);
+      equalities[row,1..N] = leadexpv-tailexpv;
+    }
+  }
+  return(canonicalizeCone(coneViaInequalities(inequalities, equalities)));
+}
+
+// iterate through sorted list
+static proc findInsertionIndex(intvec iv, list L)
+{
+  int k = size(L);
+  for (int i = 1; i <= k; i++)
+  {
+    if (iv > L[i])
+    {
+      // iv not yet in list
+      return(i-1);
+    }
+    if (iv == L[i])
+    {
+      // iv already in list
+      return(-1);
+    }
+  }
+  return(k);
+}
+
+// convert row i of bigintmat to intvec
+static proc bigintmatToIntvec(bigintmat M, int i)
+{
+  intvec iv;
+  int k = ncols(M);
+  for (int j = 1; j <= k; j++)
+  {
+    // maybe check for overflow
+    iv[j] = int(M[i,j]);
+  }
+  return(iv);
+}
+
+// makes sure bigintmat has dimensions 1 x size(iv)
+static proc intvecToBigintmat(intvec iv)
+{
+  return(bigintmat(intmat(iv, 1, size(iv))));
+}
+
 /***
  * Given a reduced Groebner basis and a weight on a facet of the tropical variety, does:
  *   1) Computes the tropical link around the facet.
@@ -1369,10 +1457,15 @@ proc tropicalVarietyNewtonWithMagma(ideal I, intvec #)
  *   - (cone) an adjacent maximal tropical Groebner cone
  *   - (bigintmat) the sum of all rays of the adjacent Groebner cone
  **/
-proc tropicalTraversalPartialIterationStep(ideal I, intvec interiorFacetPoint, string uniquePrefix)
+proc tropicalTraversalPartialIterationStep(ideal I, intvec interiorFacetPoint)
 {
   def origin = basering;
   list TIw;
+  int k;
+
+  int i, j;
+
+  ideal inIsGB, inIsGBNF;
 
   // 1) Compute the tropical link around the facet
   ideal inI = initial(I,interiorFacetPoint);
@@ -1380,22 +1473,164 @@ proc tropicalTraversalPartialIterationStep(ideal I, intvec interiorFacetPoint, s
 
   // 2) For each tropical link
   intvec wOnes;
-  for (int i=1; i<=nvars(basering); i++)
+  for (i=1; i<=nvars(basering); i++)
   {
     wOnes[i]=1;
   }
+  matrix outerNormalVectorMatrix;
+  intvec outerNormalVector;
+  cone neighbourCone;
   for (i=1; i<=size(tropicalLink); i++)
   {
-    matrix outerNormalVectorMatrix = tropicalLink[i];
-    intvec outerNormalVector = scaleAndCastToIntvec(outerNormalVectorMatrix); // todo
+    outerNormalVectorMatrix = tropicalLink[i];
+    outerNormalVector = scaleAndCastToIntvec(outerNormalVectorMatrix);
 
-    execute("ring "+uniquePrefix+"_ring("+string(i)+") = ("+charstr(origin)+"),("+varstr(origin)+"),(a(wOnes),a(interiorFacetPoint),a(outerNormalVector),lp);");
-    ideal inI = std(fetch(origin,inI));
+    execute("ring adjRing("+string(i)+") = ("+charstr(origin)+"),("+varstr(origin)+
+      "),(a(wOnes),a(interiorFacetPoint),a(outerNormalVector),lp);");
+    ideal inIsGB = std(fetch(origin,inI));
 
+    setring origin;
+    inIsGB = fetch(adjRing(i), inIsGB);
+    inIsGBNF = NF(inIsGB, I);
 
+    setring adjRing(i);
+    ideal inIsGBNF = fetch(origin,inIsGBNF);
+    ideal IsGBnonred;
+    k = ncols(inIsGB);
+    for (j = 1; j <= k; j++)
+    {
+      IsGBnonred[j] = inIsGB[j] - inIsGBNF[j];
+    }
+    ideal stdI = interred(IsGBnonred);
+    attrib(stdI, "isSB", 1);
+    ideal inI = initial(stdI,interiorFacetPoint,outerNormalVector);
+    export(stdI);
+    export(inI);
+    neighbourCone = groebnerConeFromIdeals(stdI, inI);
+
+    setring origin;
+    TIw[i] = list();
+    //TIw[i][1] = fetch(adjRing(i), IsGB);
+    TIw[i][1] = adjRing(i);
+    TIw[i][2] = neighbourCone;
+    TIw[i][3] = uniquePoint(neighbourCone);
   }
 
   return (TIw);
+}
+
+proc tropicalTraversalStep(ideal I, cone C, list knownLinks, alias list symmetryGroup)
+{
+  bigintmat interiorPoints = interiorPointsOfFacets(C);
+  int rows = nrows(interiorPoints);
+  intvec intPoint;
+  int i, j;
+  int N = nvars(basering);
+  int insertIndex;
+  list neighboringCones;
+  for (i = 1; i <= rows; i++)
+  {
+    intPoint = bigintmatToIntvec(interiorPoints, i);
+    insertIndex = findInsertionIndex(intPoint, knownLinks);
+    if (insertIndex >= 0)
+    {
+      // slow, probably
+      knownLinks = insert(
+        knownLinks,
+        bigintmatToIntvec(
+          minimalRepresentative(intvecToBigintmat(intPoint), symmetryGroup),
+          1),
+        insertIndex);
+
+      neighboringCones = neighboringCones +
+        tropicalTraversalPartialIterationStep(I, intPoint);
+    }
+  }
+  // make unique Points minimal, cast to intvec so we can compare
+  for (i = 1; i <= size(neighboringCones); i++)
+  {
+    neighboringCones[i][3] = bigintmatToIntvec(
+      minimalRepresentative(neighboringCones[i][3], symmetryGroup),
+      1);
+  }
+  return(neighboringCones, knownLinks);
+}
+
+// compute a starting cone
+proc tropicalStartingCone(ideal I)
+{
+  int d = -1;
+  def origin = basering;
+  matrix startingPointMat;
+  cone startingCone;
+  intvec startingPoint;
+  // since tropicalPointNewton is probabilistic, compute cone until it has
+  // same dimension as ideal
+  while(1)
+  {
+    startingPointMat = tropicalPointNewton(I);
+    startingPoint = cccMatrixToPositiveIntvec(startingPointMat);
+    def initialRing = switchRingsAndComputeInitialIdeal(I, startingPoint);
+    setring initialRing;
+    if (d < 0)
+    {
+      d = dim(stdI);
+    }
+    startingCone = groebnerConeFromIdeals(stdI, inI);
+    setring origin;
+    if (dimension(startingCone) == d)
+    {
+      return(list(initialRing, startingCone, uniquePoint(startingCone)));
+    }
+    kill initialRing;
+  }
+}
+
+proc tropicalVarietyFull(ideal I, list #)
+{
+  list symmetryGroup;
+  if (size(#) > 0)
+  {
+    // it's not #[1] ...
+    symmetryGroup = #;
+  }
+  def origin = basering;
+
+  int i, index;
+  list workingList, finishedCones, finishedUniquePoints, knownLinks, nc;
+
+  workingList[1] = tropicalStartingCone(I);
+  // replace with minimal representative and cast to intvec
+  workingList[1][3] = bigintmatToIntvec(minimalRepresentative(workingList[1][3], symmetryGroup), 1);
+
+  finishedCones[1]        = workingList[1][2];
+  finishedUniquePoints[1] = workingList[1][3];
+
+  while(size(workingList) > 0)
+  {
+    def initRing = workingList[1][1];
+    setring initRing;
+    setUniformizingParameter(fetch(origin, uniformizingParameter));
+    nc, knownLinks = tropicalTraversalStep(stdI, workingList[1][2], knownLinks, symmetryGroup);
+    for (i = 1; i <= size(nc); i++)
+    {
+      index = findInsertionIndex(nc[i][3], finishedUniquePoints);
+      if (index >= 0)
+      {
+        workingList[size(workingList)+1] = nc[i];
+        finishedCones        = insert(finishedCones,        nc[i][2], index);
+        finishedUniquePoints = insert(finishedUniquePoints, nc[i][3], index);
+      }
+    }
+    setring origin;
+    kill initRing;
+
+    workingList = delete(workingList, 1);
+
+    dbprint("finished cones: "+string(size(finishedCones))
+          +", working cones: "+string(size(workingList)));
+  }
+  return(finishedCones);
 }
 
 // proc saturateWithRespectToVariable(ideal I, int k)
