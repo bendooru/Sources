@@ -1929,6 +1929,24 @@ gfan::ZMatrix interiorPointsOfFacets(const gfan::ZCone &zc, const std::set<gfan:
   return relativeInteriorPoints;
 }
 
+BOOLEAN interiorPointsOfFacets(leftv res, leftv args)
+{
+  leftv u = args;
+  if (u != NULL && u->Typ() == coneID)
+  {
+    gfan::initializeCddlibIfRequired();
+    gfan::ZCone *cone = (gfan::ZCone*) u->Data();
+    std::set<gfan::ZVector> empty;
+    gfan::ZMatrix interiorPoints = interiorPointsOfFacets(*cone, empty);
+    res->rtyp = BIGINTMAT_CMD;
+    res->data = (void*) zMatrixToBigintmat(interiorPoints);
+    gfan::deinitializeCddlibIfRequired();
+    return FALSE;
+  }
+  WerrorS("interiorPointsOfFacets: unexpected parameters");
+  return TRUE;
+}
+
 
 /***
  * Computes a relative interior point and an outer normal vector for each facet of zc
@@ -2146,6 +2164,7 @@ void bbcone_setup(SModulFunctions* p)
   p->iiAddCproc("gfan.lib","span",FALSE,impliedEquations);
   p->iiAddCproc("gfan.lib","uniquePoint",FALSE,uniquePoint);
   p->iiAddCproc("gfan.lib","faceContaining",FALSE,faceContaining);
+  p->iiAddCproc("gfan.lib","interiorPointsOfFacets",FALSE,interiorPointsOfFacets);
   coneID=setBlackboxStuff(b,"cone");
 }
 
