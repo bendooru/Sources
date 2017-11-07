@@ -1308,7 +1308,7 @@ proc finalizeMagmaFile(string filename, intvec #)
     }
   }
 
-  int dummy = system("sh","sed -i '' 's/\_/\./g' "+filename+".m");
+  int dummy = system("sh","sed -i 's/M\_/M\./g' "+filename+".m");
   write(":a "+filename+".m", "T := TropicalVariety(F : WithMultiplicity:=false, All:="+all+", bound:="+bound+");");
   write(":a "+filename+".m", "_ := PrintForSingular(\""+filename+".sing\", T);");
   write(":a "+filename+".m", "exit;");
@@ -1338,6 +1338,8 @@ proc tropicalVarietyNewtonWithMagma(ideal I, intvec #)
   initializeMagmaFile(filename,nvars(basering));
   writeTriangularSet(triangI[1],filename);
   finalizeMagmaFile(filename,#);
+
+  ~;
 
   dbprint("computing tropical varieties using magma...");
   int dummy = system("sh","magma -b "+filename+".m");
@@ -1397,7 +1399,7 @@ proc groebnerConeFromIdeals(ideal I, ideal inI)
     for (j = 2; j <= size(inI[i]); j++)
     {
       row++;
-      tailexpv = leadexp(I[i][j]);
+      tailexpv = leadexp(inI[i][j]);
       equalities[row,1..N] = leadexpv-tailexpv;
     }
   }
