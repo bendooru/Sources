@@ -442,13 +442,12 @@ static proc scaleAndCastToIntvec(matrix L)
   intvec denoms;
   intvec enums;
   int denoms_gcd = int(denominator(number(L[1,1])));
-  int denoms_prod = int(denominator(number(L[1,1])));
+  int denoms_lcm = int(denominator(number(L[1,1])));
   for (int i=2; i<=k; i++)
   {
     denoms_gcd = gcd(denoms_gcd,int(denominator(number(L[1,i]))));
-    denoms_prod = denoms_prod*int(denominator(number(L[1,i])));
+    denoms_lcm = lcm(denoms_lcm,int(denominator(number(L[1,i]))));
   }
-  int denoms_lcm = denoms_prod div denoms_gcd;
 
   intvec w;
   for (i=1; i<=k; i++)
