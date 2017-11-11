@@ -301,7 +301,7 @@ EXAMPLE: example newtonPolygonNegSlopes; shows an example
       def nothing;
       return (nothing);
     }
-    denom = int(denominator(vh))
+    denom = int(denominator(vh));
     // (1, deg, coef) scaled to integral point
     M[i,1] = denom;
     M[i,2] = denom*totalDeg(G[1,i]);
