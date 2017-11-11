@@ -1,4 +1,4 @@
-version="4.0.3.3 Sep_2017 ";
+version="version tropicalPuiseux.lib 4.0.3.3 Nov_2017 "; // $Id$
 category="Commutative Algebra";
 info="
 LIBRARY:  tropicalPuiseux.lib  tropical Varieties with puiseux series
