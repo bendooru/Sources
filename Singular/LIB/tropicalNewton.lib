@@ -43,6 +43,7 @@ PROCEDURES:
 LIB "gfan.lib";
 LIB "triang.lib";
 LIB "linalg.lib";
+LIB "tropicalPuiseux.lib";
 proc mod_init()
 {
   option(redSB);
@@ -724,11 +725,8 @@ static proc tropicalVarietyNewtonTriang(ideal J, intvec optionalFlags)
       def Vlocal(jj) = newtonPolygonNegSlopes(J[i],VV[jj],optionalFlags);
       if (typeof(Vlocal(jj))=="none")
       {
-        "Magma not supported";
-        return(list());
-        dbprint("newton polygon ambiguous, falling back to magma ...");
-        list tMagma = tropicalVarietyNewtonWithMagma(J,optionalFlags);
-        return(tMagma);
+        dbprint("newton polygon ambiguous, falling back to tropicalVarietyPuiseux ...");
+        return(tropicalVarietyPuiseux(J, optionalFlags));
       }
     }
     // 3. add the newly computed negative slopes to the working list
