@@ -289,6 +289,7 @@ EXAMPLE: example newtonPolygonNegSlopes; shows an example
 
   // 2. create the matrix of vertices of the Newton polygon
   int k = ncols(G);
+  int denom;
   intmat M[k+1][3];
   for (i=1; i<=k; i++)
   {
@@ -299,8 +300,10 @@ EXAMPLE: example newtonPolygonNegSlopes; shows an example
       def nothing;
       return (nothing);
     }
-    M[i,1] = int(denominator(vh));
-    M[i,2] = totalDeg(G[1,i]);
+    denom = int(denominator(vh))
+    // (1, deg, coef) scaled to integral point
+    M[i,1] = denom;
+    M[i,2] = denom*totalDeg(G[1,i]);
     M[i,3] = int(numerator(vh));
     kill vh;
   }
