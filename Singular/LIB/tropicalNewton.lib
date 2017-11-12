@@ -1,5 +1,5 @@
 ///////////////////////////////////////////////////////////////////////////////
-version="version tropicalNewton.lib 4.0.3.3 Nov_2016 "; // $Id$
+version="version tropicalNewton.lib 4.0.3.3 Nov_2017 "; // $Id$
 category="Tropical Geometry";
 info="
 LIBRARY:         tropicalNewton.lib  Computations in Tropical Geometry
@@ -1339,8 +1339,6 @@ proc tropicalVarietyNewtonWithMagma(ideal I, intvec #)
   writeTriangularSet(triangI[1],filename);
   finalizeMagmaFile(filename,#);
 
-  ~;
-
   dbprint("computing tropical varieties using magma...");
   int dummy = system("sh","magma -b "+filename+".m");
   execute("<\""+filename+".sing\";");
@@ -1633,6 +1631,87 @@ proc tropicalVarietyFull(ideal I, list #)
           +", working cones: "+string(size(workingList)));
   }
   return(finishedCones);
+}
+
+/*
+ * PROCEDURES DOING THE ABOVE AND WRITING OUTPUT INTO FILES
+ */
+static proc writeNecessarySSIData(def S, cone C, string filename)
+{
+  setring S;
+  link ssiLink = "ssi:w "+filename;
+  write(ssiLink, stdI);
+  write(ssiLink, C);
+  close(ssiLink);
+}
+
+proc getInteriourPointsSSI(string filename, alias list symmetryGroup)
+{
+  link ssiLink = "ssi:r "+filename;
+  def I = read(ssiLink);
+  def C = read(ssiLink);
+  close(ssiLink);
+
+  bigintmat interiorPoints = interiorPointsOfFacets(C);
+  int rows = nrows(interiorPoints);
+  int cols = ncols(interiorPoints);
+  bigintmat point[1][cols];
+  list tropicalLinks;
+  list tropicalLinksModSymmetry;
+  int i, j;
+  for (i = 1; i <= rows; i++)
+  {
+    // extract submatrix
+    for (j = 1; j <= cols; j++)
+    {
+      point[1,j] = interiorPoints[i,j];
+    }
+    tropicalLinks[i] = bigintmatToIntvec(point, 1);
+    tropicalLinksModSymmetry[i] = bigintmatToIntvec
+      ( minimalRepresentative(point, symmetryGroup)
+      , 1
+      );
+  }
+  return(tropicalLinks, tropicalLinksModSymmetry);
+}
+
+proc traverseInteriourPointSSI(intvec interiourPoint, string filename, alias list symmetryGroup, alias string prefix)
+{
+  link ssiLink = "ssi:r "+filename;
+  def I = read(ssiLink);
+  // cone is irrelevant
+  close(ssiLink);
+  setUniformizingParameter(par(1));
+
+  list neighbourCones = tropicalTraversalPartialIterationStep(I, interiourPoint);
+  list points;
+  for (int i = 1; i <= size(neighbourCones); i++)
+  {
+    writeNecessarySSIData
+      ( neighbourCones[i][1]
+      , neighbourCones[i][2]
+      , prefix + "/" + string(i-1)
+      );
+    points[i] = bigintmatToIntvec
+      ( minimalRepresentative(neighbourCones[i][3], symmetryGroup)
+      , 1
+      );
+  }
+  return(points);
+}
+
+// compute a starting cone
+proc tropicalStartingConeSSI(ideal I, alias list symmetryGroup, alias string outFile)
+{
+  list gCone = tropicalStartingCone(I);
+  def initRing = gCone[1];
+  intvec uniquePoint = bigintmatToIntvec
+    ( minimalRepresentative(gCone[3], symmetryGroup)
+    , 1
+    );
+
+  writeNecessarySSIData(initRing, gCone[2], outFile);
+  return(uniquePoint);
 }
 
 // proc saturateWithRespectToVariable(ideal I, int k)
