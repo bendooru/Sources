@@ -152,23 +152,32 @@ static proc tropVarInAdaptedRing(ideal I, int p, int bound, int single)
   // convert lists of numbers to matrices
   // remove out of bounds solutions and return first solution if necessary
   list valuations;
-  number v;
   matrix valTmp[1][n];
-  int withinBounds;
+  int addToSolutions;
   for (i = 1; i<= size(expansions); i++)
   {
-    withinBounds = 1;
+    addToSolutions = 1;
     for (j = 1; j <= n; j++)
     {
-      v = puiseuxValuation(expansions[i][j]);
+      def v = puiseuxValuation(expansions[i][j]);
+      // if expansion is zero, i.e. has infinite valuation
+      if (typeof(v) == "none")
+      {
+        addToSolutions = 0;
+        kill v;
+        break;
+      }
+      // if valuation out of bounds
       if (bound > 0 && v > number(bound))
       {
-        withinBounds = 0;
+        addToSolutions = 0;
+        kill v;
         break;
       }
       valTmp[1,j] = v;
+      kill v;
     }
-    if (withinBounds)
+    if (addToSolutions)
     {
       valuations[size(valuations)+1] = valTmp;
     }
@@ -186,11 +195,18 @@ static proc puiseuxValuation(Puiseux f)
   def origin = basering;
   def S = f.in;
   setring S;
-  int i;
-  int n = polyValuation(f.numer);
-  int d = polyValuation(f.denom);
-  setring origin;
-  return (-number(n-d)/number(f.fraction));
+  if (f.numer == 0)
+  {
+    setring origin;
+    return(def(0));
+  }
+  else
+  {
+    int n = polyValuation(f.numer);
+    int d = polyValuation(f.denom);
+    setring origin;
+    return (-number(n-d)/number(f.fraction));
+  }
 }
 
 // naive implementation
@@ -199,7 +215,8 @@ static proc polyValuation(poly f)
   intvec w = 0:nvars(basering); w[1] = 1;
   int m = size(f);
   int v = deg(f,w);
-  if (v < 0) { ERROR("root outside torus"); }
+  // should be catched before reaching this procedure
+  if (v < 0) { ERROR("polyValuation: root outside torus"); }
   for (int i = 1; i <= m; i++)
   {
     v = min(v, deg(f[i], w));

@@ -55,6 +55,8 @@ proc extendBaseringPuiseux(Puiseux P, def S)
   Q.numer = imap(R1, Pnumer);
   Q.denom = imap(R1, Pdenom);
   Q.fraction = P.fraction;
+  setring R1;
+  kill Pnumer, Pdenom;
   setring R;
   return(Q);
 }
