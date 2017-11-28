@@ -300,7 +300,7 @@ EXAMPLE: example newtonPolygonNegSlopes; shows an example
       def nothing;
       return (nothing);
     }
-    denom = int(denominator(vh))
+    denom = int(denominator(vh));
     // (1, deg, coef) scaled to integral point
     M[i,1] = denom;
     M[i,2] = denom*totalDeg(G[1,i]);
@@ -444,11 +444,9 @@ static proc scaleAndCastToIntvec(matrix L)
   int k = ncols(L);
   intvec denoms;
   intvec enums;
-  int denoms_gcd = int(denominator(number(L[1,1])));
   int denoms_lcm = int(denominator(number(L[1,1])));
   for (int i=2; i<=k; i++)
   {
-    denoms_gcd = gcd(denoms_gcd,int(denominator(number(L[1,i]))));
     denoms_lcm = lcm(denoms_lcm,int(denominator(number(L[1,i]))));
   }
 
@@ -1340,8 +1338,6 @@ proc tropicalVarietyNewtonWithMagma(ideal I, intvec #)
   initializeMagmaFile(filename,nvars(basering));
   writeTriangularSet(triangI[1],filename);
   finalizeMagmaFile(filename,#);
-
-  ~;
 
   dbprint("computing tropical varieties using magma...");
   int dummy = system("sh","magma -b "+filename+".m");
