@@ -63,10 +63,9 @@ EXAMPLE: example tropicalVarietyPuiseux; shows an example"
     ERROR("tropicalVarietyPuiseux: ideal is not zero-dimensional");
   }
 
-  // TODO: check and remove t in denominator (can this at all happen?)
-  execute("ring newRing = 0,(" + parstr(R,1) + "," + varstr(R) + "),lp;");
+  // As ideals are Groebenr bases they will have no fractional coefficients
+  execute("ring newRing = 0,(" + parstr(R,1) + "," + varstr(R) + "),(L(2^20),lp);");
 
-  // this step may produce wrong data if I contains numbers with t in their denominator
   ideal I = imap(R, I);
   int n = nvars(newRing)-1;
   int order = n;
