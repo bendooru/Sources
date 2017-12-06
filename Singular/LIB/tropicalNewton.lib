@@ -1289,12 +1289,12 @@ proc writeTriangularSet(list F, string filename)
 
 proc finalizeMagmaFile(string filename, intvec #)
 {
-  string all = "false";
+  string all = "true";
   if (size(#)>=1)
   {
     if (#[1]==1)
     {
-      all = "true";
+      all = "false";
     }
   }
   string bound = "Infinity()";

@@ -25,7 +25,7 @@ intrinsic get_points(F, p:All := true, bound := Infinity()) -> Any
   roots := PuiseuxExpansion(h(g), p - 3);
 
   if not All then
-    roots := [ [roots[1]] ];
+    roots := [ roots[1] ];
   end if;
 
   if #F eq 1 then
