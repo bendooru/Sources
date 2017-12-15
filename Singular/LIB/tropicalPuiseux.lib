@@ -63,12 +63,13 @@ EXAMPLE: example tropicalVarietyPuiseux; shows an example"
     ERROR("tropicalVarietyPuiseux: ideal is not zero-dimensional");
   }
 
+  // choose order from ideal max degree
+  int order = deg(I)+5;
   // As ideals are Groebenr bases they will have no fractional coefficients
   execute("ring newRing = 0,(" + parstr(R,1) + "," + varstr(R) + "),(L(2^20),lp);");
 
   ideal I = imap(R, I);
   int n = nvars(newRing)-1;
-  int order = n;
   list vals;
   // returns empty list in case bound p is too small
   while (size(vals) == 0)
