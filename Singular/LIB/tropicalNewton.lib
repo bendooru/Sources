@@ -1112,12 +1112,12 @@ EXAMPLE: example tropicalLinkNewton; shows an example
     ideal substImagePos = imap(srestr,substImagePos);
     map substMapPos = srestr,substImagePos;
     ideal inIPos = std(substMapPos(inI));
-    list Tpos = tropicalVarietyNewton(inIPos);
+    list Tpos = tropicalVarietyNewton(inIPos, 0, 1);
 
     ideal substImageNeg = imap(srestr,substImageNeg);
     map substMapNeg = srestr,substImageNeg;
     ideal inINeg = std(substMapNeg(inI));
-    list Tneg = tropicalVarietyNewton(inINeg);
+    list Tneg = tropicalVarietyNewton(inINeg, 0, 1);
 
     if (size(Tneg)>0)
     {
@@ -1634,12 +1634,13 @@ proc tropicalVarietyFull(ideal I, list #)
 /*
  * PROCEDURES DOING THE ABOVE AND WRITING OUTPUT INTO FILES
  */
-static proc writeNecessarySSIData(def S, cone C, string filename)
+static proc writeNecessarySSIData(def S, cone C, string filename, string origStr)
 {
   setring S;
   link ssiLink = "ssi:w "+filename;
   write(ssiLink, stdI);
   write(ssiLink, C);
+  write(ssiLink, origStr);
   close(ssiLink);
 }
 
@@ -1689,6 +1690,7 @@ proc traverseInteriourPointSSI(intvec interiourPoint, string filename, alias lis
       ( neighbourCones[i][1]
       , neighbourCones[i][2]
       , prefix + "/" + string(i-1)
+      , filename+"+"+string(interiourPoint)
       );
     points[i] = bigintmatToIntvec
       ( minimalRepresentative(neighbourCones[i][3], symmetryGroup)
@@ -1708,7 +1710,7 @@ proc tropicalStartingConeSSI(ideal I, alias list symmetryGroup, alias string out
     , 1
     );
 
-  writeNecessarySSIData(initRing, gCone[2], outFile);
+  writeNecessarySSIData(initRing, gCone[2], outFile, "null");
   return(uniquePoint);
 }
 
