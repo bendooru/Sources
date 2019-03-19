@@ -45,6 +45,7 @@
 
 #include "misc/options.h"
 #include "misc/intvec.h"
+#include "misc/prime.h"
 
 #include "polys/monomials/ring.h"
 #include "polys/templates/p_Procs.h"
@@ -1283,8 +1284,12 @@ static BOOLEAN ii_transFac_init(leftv res, leftv args)
   coeffs cf;
   if (chr != 0)
   {
-    // nInitChar handles invalid chr values, so don't check here
-    cf = nInitChar(n_Zp, (void*)(long) chr);
+    int pchr = IsPrime (chr);
+    if (pchr != chr)
+    {
+      Print ("// warning: invalid characteristic, using %d instead.", pchr);
+    }
+    cf = nInitChar(n_Zp, (void*)(long) pchr);
   }
   else
   {
@@ -1369,6 +1374,7 @@ static coeffs nfInitCfByName(char *s, n_coeffType n)
     }
     else
     {
+      // since chr will be output by existing cring, no checks need to be made
       cf = nInitChar(n_Zp, (void*)(long) chr);
     }
 
